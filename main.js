@@ -83,9 +83,47 @@ function convert_file(file_path) {
     const html_data = parseHTML(fs.readFileSync(path.join(CWD, file_path)));
 
     /** @type {HTMLElement[]} */
+    // const stack = [html_data.childNodes[0]];
+    // while (stack.length>0) {
+    //     const corrente = stack.pop();
+    //     if (component_names.includes(corrente.rawTagName)) {
+    //         // substitute
+    //         const element_name = corrente.rawTagName;
+    //         const actual_params_str = corrente.toString();
+
+    //         // const actual_para_XML = parserXML.parse(actual_params_str);
+    //         const actual_params = {};
+    //         for (let param_name of components.get(element_name).parameters) {
+    //             actual_params[param_name] = actual_params_str.match(new RegExp(`<${param_name}>([\\S\\s]*)<\/${param_name}>`))[1];
+    //         }
+
+    //         const new_elem = parseHTML(
+    //             populate_template(
+    //                 element_name, 
+    //                 actual_params
+    //             )
+    //         );
+
+    //         corrente.replaceWith(new_elem);
+    //         stack.push(new_elem);
+    //     }else{
+    //         for (let child of corrente.childNodes) {
+    //             stack.push(child)
+    //         }
+    //     }
+    // }
+
     const stack = [html_data.childNodes[0]];
+    const stack_reverse = [];
     while (stack.length>0) {
         const corrente = stack.pop();
+        stack_reverse.push(corrente);
+        for (let child of corrente.childNodes) {
+            stack.push(child);
+        }
+    }
+    while (stack_reverse.length>0) {
+        corrente = stack_reverse.pop();
         if (component_names.includes(corrente.rawTagName)) {
             // substitute
             const element_name = corrente.rawTagName;
@@ -105,11 +143,6 @@ function convert_file(file_path) {
             );
 
             corrente.replaceWith(new_elem);
-            stack.push(new_elem);
-        }else{
-            for (let child of corrente.childNodes) {
-                stack.push(child)
-            }
         }
     }
 
