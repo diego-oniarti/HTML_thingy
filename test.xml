@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Element xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="./Element.xsd">
+    <Name>Paragrafo</Name>
+
+    <Parameter>titolo</Parameter>
+    <Parameter>testo</Parameter>
+    <Parameter>ciao</Parameter>
+
+    <Template>
+        <div>
+            <h1 onclick="alert('culo')"><titolo/></h1>
+            <p><testo/></p>
+        </div>
+    </Template>
+</Element>
