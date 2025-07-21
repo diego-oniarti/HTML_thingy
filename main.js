@@ -10,7 +10,7 @@ import { cwd } from "node:process";
 const  parser = new ArgumentParser({
     description: "My HTML thingy"
 });
-parser.add_argument('-c', '--components', {default:'Components', help:'The name of the components directory'});
+parser.add_argument('-c', '--components', {default:'components', help:'The name of the components directory'});
 parser.add_argument('-o', '--out', {default:'out', help:'The name of the output directory'})
 parser.add_argument('-s', '--src', {default:'src', help:'The name of the source directory'})
 const args = parser.parse_args();
@@ -39,8 +39,12 @@ class Component {
         const file_contents = readFileSync(file_path);
         const XMLdata = parserXML.parse(file_contents).Element;
 
+        /** @type {String} */
         this.name = XMLdata.Name;
+        /** @type {String[]} */
         this.parameters = XMLdata.Parameter;
+        if (!this.parameters) this.parameters = [];
+        /** @type {String} */
         this.template = file_contents.toString().match(/<Template>(?<template>[\s\S]*)<\/Template>/).groups.template;
     }
 }
@@ -52,10 +56,11 @@ const component_names = new Set();
 
 function leggi_componenti() {
     for (let file_name of readdirSync(join(CWD, COMPS_FOLDER))) {
+        if (!file_name.endsWith('.xml')) continue;
         const file_path = join(CWD, COMPS_FOLDER, file_name)
 
         const component = new Component(file_path);
-        console.log(`Created component ${component.name}`);
+        console.log(`Creating component ${component.name}`);
 
         components.set(component.name, component);
         component_names.add(component.name)
@@ -82,17 +87,31 @@ function populate_template(name, params) {
 function convert_file(file_path) {
     const html_data = parseHTML(readFileSync(join(CWD, SRC_FOLDER, file_path)));
 
-    const stack = [html_data.childNodes[0]];
-    const stack_reverse = [];
-    while (stack.length>0) {
-        const corrente = stack.pop();
-        stack_reverse.push(corrente);
-        for (let child of corrente.childNodes) {
-            stack.push(child);
-        }
+    const stack = [];
+    for (let child of html_data.childNodes) {
+        stack.push({
+            node: child,
+            visited: false,
+        });
     }
-    while (stack_reverse.length>0) {
-        const corrente = stack_reverse.pop();
+
+    while (stack.length>0) {
+        const top = stack[stack.length-1];
+
+        // Simula post-order mantenendo una
+        if (!top.visited) {
+            for (let child of top.node.childNodes) {
+                stack.push({
+                    node: child,
+                    visited: false
+                });
+            }
+            top.visited = true;
+            continue;
+        }
+
+        const corrente = stack.pop().node;
+
         if (component_names.has(corrente.rawTagName)) {
             // substitute
             const element_name = corrente.rawTagName;
@@ -100,8 +119,11 @@ function convert_file(file_path) {
 
             // const actual_para_XML = parserXML.parse(actual_params_str);
             const actual_params = {};
+
             for (let param_name of components.get(element_name).parameters) {
-                actual_params[param_name] = actual_params_str.match(new RegExp(`<${param_name}>([\\S\\s]*)<\/${param_name}>`))[1];
+                actual_params[param_name] = actual_params_str.match(
+                    new RegExp(`<${param_name}>([\\S\\s]*)<\/${param_name}>`)
+                )[1];
             }
 
             const new_elem = parseHTML(
@@ -128,6 +150,7 @@ function main() {
         const corrente = stack.pop();
 
         for (let child_name of readdirSync(join(SRC_BASE, corrente))) {
+            if (child_name.startsWith('.')) continue;
             const full_child_path = join(SRC_BASE, corrente, child_name)
             const relative_child_path = join(corrente, child_name);
 
@@ -143,7 +166,8 @@ function main() {
 
             if (lstat.isFile()) {
                 if (child_name.endsWith(".html")) {
-                    convert_file(join(relative_child_path));
+                    console.log(`Converting ${relative_child_path}`);
+                    convert_file(relative_child_path);
                 }else{
                     copyFileSync(
                         full_child_path,

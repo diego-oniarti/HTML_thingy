@@ -16,6 +16,7 @@
     "node-html-parser": "^6.1.13"
   },
   "bin": {
-      "html_compile": "./main.js"
+      "html_compile": "./main.js",
+      "html_init": "./init.js"
   }
 }
