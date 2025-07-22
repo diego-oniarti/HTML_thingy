@@ -53,6 +53,8 @@ class Component {
 const components = new Map();
 /** @type {Set<String>} */
 const component_names = new Set();
+/** @type {Set<String>} */
+const parameter_names = new Set();
 
 function leggi_componenti() {
     for (let file_name of readdirSync(join(CWD, COMPS_FOLDER))) {
@@ -64,6 +66,9 @@ function leggi_componenti() {
 
         components.set(component.name, component);
         component_names.add(component.name)
+        for (let parameter of component.parameters) {
+            parameter_names.add(parameter);
+        }
     }
 }
 
@@ -84,8 +89,8 @@ function populate_template(name, params) {
     return ret_string
 }
 
-function convert_file(file_path) {
-    const html_data = parseHTML(readFileSync(join(CWD, SRC_FOLDER, file_path)));
+function convert_string(content) {
+    const html_data = parseHTML(content);
 
     const stack = [];
     for (let child of html_data.childNodes) {
@@ -137,11 +142,40 @@ function convert_file(file_path) {
         }
     }
 
-    writeFileSync(join(CWD, OUT_FOLDER, file_path), html_data.toString());
+    return html_data.toString();
+}
+
+function convert_file(file_path) {
+    const content = readFileSync(join(CWD, SRC_FOLDER, file_path));
+    const converted = convert_string(content);
+    writeFileSync(join(CWD, OUT_FOLDER, file_path), converted);
+}
+
+function restoreSelfClosingTags(html) {
+    for (const tag of parameter_names) {
+        const pattern = new RegExp(`<${tag}></${tag}>`, 'g');
+        html = html.replace(pattern, `<${tag}/>`);
+    }
+    return html;
+}
+
+function unpack_componenti() {
+    console.log("unpack");
+    let finished;
+    do {
+        finished = true;
+        for (let componente of components.values()) {
+            const old_template = componente.template;
+            componente.template = restoreSelfClosingTags(convert_string(componente.template));
+            const new_template = componente.template;
+            if (new_template!=old_template) finished = false;
+        }
+    }while (!finished);
 }
 
 function main() {
     leggi_componenti();
+    unpack_componenti();
     if (!existsSync(OUT_FOLDER)) mkdirSync(join(CWD, OUT_FOLDER))
 
     const stack = ['.'];
