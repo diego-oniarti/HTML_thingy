@@ -2,11 +2,13 @@
 
 import { XMLParser } from "fast-xml-parser";
 import { parse } from "node-html-parser";
-import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync, lstatSync, copyFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { ArgumentParser } from "argparse";
 import { cwd } from "node:process";
 import { spawnSync } from "node:child_process";
+import { promises as fsPromises } from "fs";
+const { readFile, writeFile, readdir, mkdir, lstat, copyFile } = fsPromises;
 
 const  parser = new ArgumentParser({
     description: "My HTML thingy"
@@ -148,10 +150,15 @@ function convert_string(content) {
     return html_data.toString();
 }
 
-function convert_file(file_path) {
-    const content = readFileSync(join(CWD, SRC_FOLDER, file_path));
+async function convert_file(file_path) {
+    const fullPath = join(CWD, SRC_FOLDER, file_path);
+    const outPath = join(CWD, OUT_FOLDER, file_path);
+
+    const content = await readFile(fullPath, 'utf-8');
     const converted = convert_string(content);
-    writeFileSync(join(CWD, OUT_FOLDER, file_path), converted);
+    await writeFile(outPath, converted);
+
+    if (INDENT) indent_file(outPath);
 }
 
 function restoreSelfClosingTags(html) {
@@ -194,47 +201,48 @@ function indent_file(path) {
     }
 }
 
-function main() {
+async function main() {
     leggi_componenti();
     unpack_componenti();
-    if (!existsSync(OUT_FOLDER)) mkdirSync(join(CWD, OUT_FOLDER))
+    if (!existsSync(OUT_FOLDER)) mkdirSync(join(CWD, OUT_FOLDER));
 
     const stack = ['.'];
     const SRC_BASE = join(CWD, SRC_FOLDER);
-    while (stack.length>0) {
+    const convertTasks = [];
+
+    while (stack.length > 0) {
         const corrente = stack.pop();
+        const currentPath = join(SRC_BASE, corrente);
+        const children = await readdir(currentPath);
 
-        for (let child_name of readdirSync(join(SRC_BASE, corrente))) {
-            if (child_name.startsWith('.')) continue;
-            const full_child_path = join(SRC_BASE, corrente, child_name)
-            const relative_child_path = join(corrente, child_name);
+        for (let child of children) {
+            if (child.startsWith('.')) continue;
 
-            const lstat = lstatSync(full_child_path);
+            const fullPath = join(currentPath, child);
+            const relativePath = join(corrente, child);
+            const stat = await lstat(fullPath);
 
-            if (lstat.isDirectory()) {
-                stack.push(relative_child_path);
-                const newDir = join(CWD, OUT_FOLDER, relative_child_path);
+            if (stat.isDirectory()) {
+                stack.push(relativePath);
+                const newDir = join(CWD, OUT_FOLDER, relativePath);
                 if (!existsSync(newDir)) {
-                    mkdirSync(newDir);
+                    await mkdir(newDir);
                 }
-            }
-
-            if (lstat.isFile()) {
-                if (child_name.endsWith(".html")) {
-                    console.log(`Converting ${relative_child_path}`);
-                    convert_file(relative_child_path);
-                    if (INDENT) indent_file(join(CWD, OUT_FOLDER, relative_child_path));
-                }else{
-                    copyFileSync(
-                        full_child_path,
-                        join(CWD, OUT_FOLDER, relative_child_path)
-                    );
+            } else if (stat.isFile()) {
+                if (child.endsWith(".html")) {
+                    console.log(`Scheduling ${relativePath}`);
+                    convertTasks.push(convert_file(relativePath));
+                } else {
+                    const outPath = join(CWD, OUT_FOLDER, relativePath);
+                    convertTasks.push(copyFile(fullPath, outPath));
                 }
             }
 
         }
     }
 
+    await Promise.allSettled(convertTasks);
+    console.log("All conversions completed.");
 }
 
-main();
+main().catch(console.error);
