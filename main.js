@@ -186,12 +186,12 @@ function unpack_componenti() {
 }
 
 function indent_file(path) {
-    let result = spawnSync("vim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
+    let result = spawnSync("nvim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
         stdio: "ignore",
     });
 
     if (result.error) {
-        result = spawnSync("nvim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
+        result = spawnSync("vim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
             stdio: "ignore",
         });
 
