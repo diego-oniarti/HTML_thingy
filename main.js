@@ -6,8 +6,8 @@ import { readFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { ArgumentParser } from "argparse";
 import { cwd } from "node:process";
-import { spawnSync } from "node:child_process";
 import { promises as fsPromises } from "fs";
+import prettier from "prettier";
 const { readFile, writeFile, readdir, mkdir, lstat, copyFile } = fsPromises;
 
 const  parser = new ArgumentParser({
@@ -16,14 +16,14 @@ const  parser = new ArgumentParser({
 parser.add_argument('-c', '--components', {default:'components', help:'The name of the components directory'});
 parser.add_argument('-o', '--out', {default:'out', help:'The name of the output directory'})
 parser.add_argument('-s', '--src', {default:'src', help:'The name of the source directory'})
-parser.add_argument('-I', '--indent', {action:'store_const', const:'true', help:'Indents the output files. Requires the vim or nvim commands'})
+parser.add_argument('-I', '--no-indent', {action:'store_const', const:'false', default:'true', help:'Disables output file indentation'})
 const args = parser.parse_args();
 
 const COMPS_FOLDER = args.components;
 const OUT_FOLDER = args.out;
 const SRC_FOLDER = args.src;
 const CWD = cwd();
-const INDENT = args.indent==='true';
+const INDENT = args.no_indent==='true';
 
 const parserXML = new XMLParser({
     ignoreAttributes:false,
@@ -155,10 +155,9 @@ async function convert_file(file_path) {
     const outPath = join(CWD, OUT_FOLDER, file_path);
 
     const content = await readFile(fullPath, 'utf-8');
-    const converted = convert_string(content);
+    let converted = convert_string(content);
+    if (INDENT) converted = await prettier.format(converted, { parser: "html" });
     await writeFile(outPath, converted);
-
-    if (INDENT) indent_file(outPath);
 }
 
 function restoreSelfClosingTags(html) {
@@ -183,22 +182,6 @@ function unpack_componenti() {
         }
         max_recursion_depth--;
     }while (!finished && max_recursion_depth>0);
-}
-
-function indent_file(path) {
-    let result = spawnSync("nvim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
-        stdio: "ignore",
-    });
-
-    if (result.error) {
-        result = spawnSync("vim", ["-c", "norm gg=G", "-c", "wq", "-es", path], {
-            stdio: "ignore",
-        });
-
-        if (result.error) {
-            console.log(`Couldn't indent file ${path}`);
-        }
-    }
 }
 
 async function main() {

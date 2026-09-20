@@ -13,10 +13,11 @@
   "dependencies": {
     "argparse": "^2.0.1",
     "fast-xml-parser": "^4.4.0",
-    "node-html-parser": "^6.1.13"
+    "node-html-parser": "^6.1.13",
+    "prettier": "^3.9.8"
   },
   "bin": {
-      "html_compile": "./main.js",
-      "html_init": "./init.js"
+    "html_compile": "./main.js",
+    "html_init": "./init.js"
   }
 }
